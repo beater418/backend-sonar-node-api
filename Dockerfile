@@ -1,9 +1,10 @@
-FROM node:24-alpine
+#FROM node:24-alpine
+FROM gcr.io/distroless/nodejs24-debian12
 
 # Update packages to fix known OS vulnerabilities (e.g., busybox, openssl)
-RUN apk update && apk upgrade --no-cache \
-	&& npm install -g npm@latest \
-	&& npm cache clean --force
+# RUN apk update && apk upgrade --no-cache \
+# 	&& npm install -g npm@latest \
+# 	&& npm cache clean --force
 
 WORKDIR /app
 
