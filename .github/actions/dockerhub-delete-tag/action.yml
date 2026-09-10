@@ -1,0 +1,62 @@
+name: Docker Hub Delete Tag
+description: Deletes a Docker Hub image tag using Docker Hub API
+
+inputs:
+  image_name:
+    description: Full image name in the format namespace/repository
+    required: true
+  image_tag:
+    description: Tag to delete
+    required: true
+  dockerhub_username:
+    description: Docker Hub username
+    required: true
+  dockerhub_token:
+    description: Docker Hub access token or password
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Delete tag via Docker Hub API
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image_name }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        DOCKERHUB_USERNAME: ${{ inputs.dockerhub_username }}
+        DOCKERHUB_TOKEN: ${{ inputs.dockerhub_token }}
+      run: |
+        set -euo pipefail
+
+        NAMESPACE="${IMAGE_NAME%/*}"
+        REPOSITORY="${IMAGE_NAME#*/}"
+
+        LOGIN_RESPONSE=$(curl -sS -X POST "https://hub.docker.com/v2/users/login/" \
+          -H "Content-Type: application/json" \
+          -d "{\"username\":\"${DOCKERHUB_USERNAME}\",\"password\":\"${DOCKERHUB_TOKEN}\"}")
+
+        TOKEN=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("token", ""))' <<< "$LOGIN_RESPONSE")
+
+        if [ -z "$TOKEN" ]; then
+          echo "No se pudo obtener token de Docker Hub"
+          echo "$LOGIN_RESPONSE"
+          exit 1
+        fi
+
+        HTTP_CODE=$(curl -sS -o /tmp/delete_tag_response.txt -w "%{http_code}" \
+          -X DELETE "https://hub.docker.com/v2/repositories/${NAMESPACE}/${REPOSITORY}/tags/${IMAGE_TAG}/" \
+          -H "Authorization: JWT ${TOKEN}")
+
+        if [ "$HTTP_CODE" = "204" ]; then
+          echo "Tag eliminado: ${IMAGE_NAME}:${IMAGE_TAG}"
+          exit 0
+        fi
+
+        if [ "$HTTP_CODE" = "404" ]; then
+          echo "Tag no encontrado (tratado como idempotente): ${IMAGE_NAME}:${IMAGE_TAG}"
+          exit 0
+        fi
+
+        echo "Fallo eliminando tag ${IMAGE_NAME}:${IMAGE_TAG}. HTTP ${HTTP_CODE}"
+        cat /tmp/delete_tag_response.txt
+        exit 1

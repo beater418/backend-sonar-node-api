@@ -7,7 +7,9 @@ on:
 
 env:
   NODE_VERSION: 24
-  DOCKER_IMAGE_REPOSITORY_NAME: fercdevv/backend-sonar-node-api:latest
+  DOCKER_IMAGE_REPOSITORY_NAME: fercdevv/backend-sonar-node-api
+  DOCKER_IMAGE_TAG: latest
+  REMOTE_IMAGE_REF: fercdevv/backend-sonar-node-api:${{ github.sha }}
   TRIVY_CACHE_DIR: /tmp/trivy-cache
 
 jobs:
@@ -24,12 +26,34 @@ jobs:
           node-version: ${{ env.NODE_VERSION}}
       
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Ejecutar unit tests
         run: npm test
-  trivy-scan:
+  docker-build-push:
+    runs-on: ubuntu-latest
     needs: build-and-test
+
+    steps:
+      - name: Checkout de codigo
+        uses: actions/checkout@v7
+      
+      - name: Conectar con DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+      - name: Build docker image and push sha tag
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}:${{ github.sha }}
+
+  trivy-scan:
+    needs: docker-build-push
     runs-on: ubuntu-latest
 
     steps:
@@ -42,7 +66,7 @@ jobs:
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}
+          image-ref: ${{ env.REMOTE_IMAGE_REF }}
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
           format: 'table'
           exit-code: '1'
@@ -50,23 +74,41 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
-  docker-build-push:
+  docker-cleanup-failed-scan:
     runs-on: ubuntu-latest
-    needs: trivy-scan
+    needs:
+      - docker-build-push
+      - trivy-scan
+    if: ${{ needs.trivy-scan.result == 'failure' }}
 
     steps:
       - name: Checkout de codigo
         uses: actions/checkout@v7
-      
+
+      - name: Delete sha tag from Docker Hub
+        uses: ./.github/actions/dockerhub-delete-tag
+        with:
+          image_name: ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}
+          image_tag: ${{ github.sha }}
+          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  docker-promote-latest:
+    runs-on: ubuntu-latest
+    needs: trivy-scan
+    if: ${{ needs.trivy-scan.result == 'success' }}
+
+    steps:
       - name: Conectar con DockerHub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
         
-      - name: Build docker image and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}
+      - name: Pull sha image
+        run: docker pull ${{ env.REMOTE_IMAGE_REF }}
+
+      - name: Promote sha to latest
+        run: |
+          docker tag ${{ env.REMOTE_IMAGE_REF }} ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+          docker push ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
