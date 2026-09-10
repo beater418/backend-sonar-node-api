@@ -112,3 +112,28 @@ jobs:
         run: |
           docker tag ${{ env.REMOTE_IMAGE_REF }} ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
           docker push ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+  deploy-fargate-aws:
+    needs: docker-promote-latest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout de codigo
+        uses: actions/checkout@v7
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Deploy to AWS Fargate with Cloudformation
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/ecs.yml \
+            --stack-name my-fargate-stack \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              ImageUrl=${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+              VpcId=vpc-0a3cd97730bc5332b \
+              Subnets="subnet-084371090cddeab02,subnet-08ee9a8fbd634ee19,subnet-0233ac4ffbd7f09c9,subnet-081e593c9cc8b1376,subnet-0790db53816907cc4,subnet-0a8702af878a5a838"
