@@ -47,4 +47,4 @@ jobs:
         with:
           context: .
           push: true
-          tag: ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}
+          tags: ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}
