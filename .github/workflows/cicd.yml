@@ -8,6 +8,7 @@ on:
 env:
   NODE_VERSION: 24
   DOCKER_IMAGE_REPOSITORY_NAME: fercdevv/backend-sonar-node-api:latest
+  TRIVY_CACHE_DIR: /tmp/trivy-cache
 
 jobs:
   build-and-test:
@@ -27,6 +28,27 @@ jobs:
 
       - name: Ejecutar unit tests
         run: npm test
+  trivy-scan:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout de codigo
+        uses: actions/checkout@v7
+      
+      - name: Setup trivy cache directory
+        run: mkdir -p ${{ env.TRIVY_CACHE_DIR }}
+
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE_REPOSITORY_NAME }}
+          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
   docker-build-push:
     runs-on: ubuntu-latest
