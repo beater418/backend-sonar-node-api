@@ -15,7 +15,7 @@ describe('GET /api/hello', () => {
     it('deberia retornar un json mensaje de hola mundo', async () => {
         const response = await request(app).get('/api/hello');
         expect(response.status).toBe(200);
-        expect(response.body).toHaveProperty('message', 'Hola mundo!');
+        expect(response.body).toHaveProperty('message', 'Hola mundo workflow!');
     })
 })
 
