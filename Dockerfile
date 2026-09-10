@@ -1,5 +1,5 @@
-#FROM node:24-alpine
-FROM gcr.io/distroless/nodejs24-debian12
+FROM node:24-trixie-slim
+#FROM gcr.io/distroless/nodejs24-debian12
 
 # Update packages to fix known OS vulnerabilities (e.g., busybox, openssl)
 # RUN apk update && apk upgrade --no-cache \
