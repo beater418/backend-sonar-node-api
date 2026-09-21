@@ -34,7 +34,7 @@ pipeline {
 
         stage ("Mensaje final") {
             steps {
-              echo "Pipeline completed successfully!"
+              echo "Pipeline completed successfully! from branch develop"
             }
         }
     }
