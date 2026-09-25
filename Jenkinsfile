@@ -1,5 +1,5 @@
 node {
-    docker.image{'node:24 alpine'}.inside {
+    docker.image('node:24-alpine').inside {
         stage("Listar archivos") {
             sh "ls -la"
         }
