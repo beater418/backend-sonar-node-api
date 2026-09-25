@@ -1,41 +1,23 @@
-pipeline {
-    agent {
-        docker {
-            image 'node:24-alpine'
-        }
-    }
-
-    stages {
+node {
+    docker.image{'node:24 alpine'}.inside {
         stage("Listar archivos") {
-            steps {
-                sh "ls -la"
-            }
+            sh "ls -la"
         }
 
         stage('Check node version (agent node)') {
-            
-            steps {
-                sh 'node -v'
-            }
+            sh 'node -v'
         }
 
         stage('Instalar dependencias') {
-            
-            steps {
-                sh 'npm install'
-            }
+            sh 'npm install'
         }
 
         stage ("Ejecutar tests") {
-            steps {
-                sh 'npm test'
-            }
+            sh 'npm test'
         }
 
         stage ("Mensaje final") {
-            steps {
-              echo "Pipeline completed successfully! from branch develop"
-            }
+            echo "Pipeline completed successfully! from branch develop"
         }
     }
 }
